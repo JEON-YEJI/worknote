@@ -87,6 +87,11 @@ svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-widt
 .input::placeholder{color:#A9B1BF}
 .input:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,42,78,.10)}
 .input.invalid{border-color:#F2B8B5}
+/* 날짜 입력칸: iOS Safari에서 칸 밖으로 넘치는 문제 방지 */
+.grid2 > *, .field{min-width:0}
+input[type="date"].input, input[type="datetime-local"].input{display:block;width:100%;max-width:100%;min-width:0;-webkit-appearance:none;appearance:none;line-height:36px;text-align:left}
+input[type="date"].input::-webkit-date-and-time-value, input[type="datetime-local"].input::-webkit-date-and-time-value{text-align:left;margin:0;min-height:1.5em}
+input[type="date"].input::-webkit-datetime-edit, input[type="datetime-local"].input::-webkit-datetime-edit{padding:0}
 .list{display:flex;flex-direction:column;gap:6px}
 .list-row{display:flex;align-items:center;gap:6px}
 .list-row .bullet{width:6px;height:6px;border-radius:50%;background:var(--navy-line);flex:none;margin:0 2px 0 4px}
