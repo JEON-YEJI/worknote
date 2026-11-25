@@ -326,7 +326,6 @@ body.pg-mode .pg-view{display:block}
       <button class="nav-item" id="xlsxBtn" style="margin-top:-6px"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>작성 이력 엑셀로 받기</button>
     </div>
     <div class="side-foot">
-      <button class="nav-item" id="dbBtn"><svg class="i" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>데이터베이스 연결<span class="db-dot" id="dbDot"></span></button>
       <button class="nav-item" id="guideBtn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.5h.01"/></svg>사용 안내</button>
     </div>
   </aside>
@@ -1281,7 +1280,7 @@ function showGuide(){
   box.innerHTML=`<div class="modal-body"><h3>WORK NOTE 사용 안내</h3><p>한 번 입력한 업무 내용으로 보고서·이메일·메신저 문서를 만듭니다.</p>
   <ol><li><b>문서 유형 선택</b> – 왼쪽 메뉴에서 일일·주간 업무보고, 특이사항 보고, 업무 인수인계, 업무 협조 요청, 회의록 중 하나를 고릅니다.</li>
   <li><b>엑셀로 받기</b> – 작성 이력 아래 버튼을 누르면 저장된 문서가 전체 목록과 문서 유형별 시트로 정리된 엑셀 파일로 저장됩니다.</li>
-  <li><b>데이터베이스 연결</b> – 왼쪽 아래 메뉴에서 Supabase를 연결하면 작성한 문서가 DB에 저장되어 다른 기기·다른 사람과 함께 볼 수 있습니다.</li>
+  <li><b>데이터 공유</b> – 사이트에 Supabase가 연결되어 있으면 작성한 문서가 자동으로 저장되어, 다른 기기·다른 사람의 문서도 작성 이력과 엑셀 파일에 함께 나타납니다.</li>
   <li><b>판교어 변환기</b> – 왼쪽 도구 메뉴에서 열 수 있습니다. 컨펌, 어싸인 같은 판교어를 표준어로 바꾸거나 반대로 바꾸고, 사전에서 뜻을 찾아볼 수 있습니다.</li>
   <li><b>업무 협조 요청</b> – 다른 부서에 도움을 요청할 때 협조 부서, 요청 배경, 요청 내용, 회신 기한을 적으면 협조 요청 문서·메일로 정리됩니다.</li>
   <li><b>내용 입력</b> – 기본 정보와 업무 내용을 적습니다. <b>필수</b> 표시 항목을 먼저 채우고, 줄마다 하나의 업무를 적은 뒤 Enter로 다음 줄을 추가합니다.</li>
@@ -1523,10 +1522,11 @@ $('#pgNav').onclick = ()=>{ setMode('pangyo'); closeNav(); };
 
 /* =========================================================
    데이터베이스 연결 (Supabase)
-   - 사이트를 여는 모든 사람이 같은 DB를 쓰게 하려면 아래 DB_CONFIG를 채우세요.
-   - 비워 두면 각 사용자가 [데이터베이스 연결] 화면에서 직접 입력합니다(브라우저에만 저장).
+   - 아래 DB_CONFIG에 Supabase 주소와 anon(publishable) 키를 넣으면
+     사이트를 여는 모든 사람의 문서가 같은 DB에 자동 저장·동기화됩니다.
+   - 비워 두면 데이터베이스 없이 각 브라우저에만 저장됩니다.
    ========================================================= */
-const DB_CONFIG = { url:'', key:'', workspace:'' };
+const DB_CONFIG = { url:'https://ztmrvojqwcswmntjliai.supabase.co', key:'sb_publishable_D2mNZdWxLI_qB4UaQIy3zw_MCrp3hlK', workspace:'worknote' };
 const DB_TABLE = 'worknote_docs';
 const DB_SQL = `-- WORK NOTE 문서 저장용 테이블
 create table if not exists public.worknote_docs (
@@ -1548,7 +1548,7 @@ create policy "worknote delete" on public.worknote_docs for delete to anon using
 
 const db = { cfg:null, status:'off', msg:'', lastSync:0, timers:{} };
 db.fixed = !!(DB_CONFIG.url && DB_CONFIG.key);
-db.cfg = db.fixed ? {...DB_CONFIG, workspace: DB_CONFIG.workspace||'default'} : store.get('worknote.db', null);
+db.cfg = db.fixed ? {...DB_CONFIG, workspace: DB_CONFIG.workspace||'worknote'} : null;
 
 const dbBase = c => c.url.trim().replace(/\/+$/,'').replace(/\/rest\/v1.*$/,'') + '/rest/v1/' + DB_TABLE;
 function dbHeaders(c, extra){
@@ -1635,57 +1635,7 @@ async function dbSync(showToast){
     return true;
   }catch(e){ setDbStatus('error', e.message); if(showToast) toast(e.message, true); return false; }
 }
-function showDbModal(){
-  const m=$('#modal'), box=$('#modalBox'); box.className='modal wide db';
-  const c = db.cfg || {url:'', key:'', workspace:'default'};
-  const ro = db.fixed ? 'readonly' : '';
-  box.innerHTML = `<div class="modal-body">
-    <h3>데이터베이스 연결</h3>
-    <p>작성한 문서를 Supabase 데이터베이스에 저장해 다른 기기·다른 사람과 함께 볼 수 있습니다.</p>
-    ${dbStatusHTML()}
-    ${db.fixed?'<p style="font-size:12.5px;margin-bottom:10px">이 사이트에는 관리자가 설정한 기본 연결이 적용되어 있습니다.</p>':''}
-    <div class="db-form">
-      <div class="field"><label class="label" for="dbUrl">Project URL</label><input class="input" id="dbUrl" ${ro} value="${esc(c.url)}" placeholder="https://abcdefgh.supabase.co"></div>
-      <div class="field"><label class="label" for="dbKey">API 키 (anon 또는 publishable)</label><input class="input" id="dbKey" ${ro} type="password" value="${esc(c.key)}" placeholder="eyJhbGciOi… 또는 sb_publishable_…"><div class="hint">service_role·secret 키는 절대 넣지 마세요. 웹사이트 방문자에게 노출됩니다.</div></div>
-      <div class="field"><label class="label" for="dbWs">저장 공간 이름</label><input class="input" id="dbWs" ${ro} value="${esc(c.workspace||'default')}" placeholder="예) 학생지원팀"><div class="hint">같은 이름을 입력한 사람끼리 작성 이력을 함께 봅니다.</div></div>
-    </div>
-    <div class="db-btns">
-      ${db.fixed?'':`<button class="btn primary" data-db="save">저장하고 연결</button><button class="btn" data-db="test">연결 테스트</button>`}
-      ${db.cfg?`<button class="btn" data-db="sync">지금 동기화</button>`:''}
-      ${db.cfg&&!db.fixed?`<button class="btn danger" data-db="off">연결 해제</button>`:''}
-    </div>
-    <details class="db-help"${db.cfg?'':' open'}>
-      <summary>처음 설정하는 방법 (Supabase 무료)</summary>
-      <ol>
-        <li><b>supabase.com</b>에 가입하고 <b>New project</b>로 프로젝트를 만듭니다.</li>
-        <li>왼쪽 메뉴 <b>SQL Editor</b>에서 아래 SQL을 붙여 넣고 <b>Run</b>을 누릅니다.</li>
-        <li><b>Project Settings → API</b>(또는 Connect 버튼)에서 <b>Project URL</b>과 <b>anon / publishable 키</b>를 복사합니다.</li>
-        <li>위 칸에 붙여 넣고 <b>연결 테스트</b> → <b>저장하고 연결</b>을 누릅니다.</li>
-        <li>모든 방문자가 자동으로 같은 DB를 쓰게 하려면 index.html의 <code>DB_CONFIG</code>에 값을 넣고 GitHub에 다시 올리세요.</li>
-      </ol>
-      <div class="sql"><pre>${esc(DB_SQL)}</pre><button class="btn" data-db="copysql">SQL 복사</button></div>
-    </details>
-  </div>
-  <div class="modal-foot"><button class="btn" data-db="close">닫기</button></div>`;
-  m.classList.add('show');
-  m.onclick = async e=>{
-    if(e.target===m){ m.classList.remove('show'); m.onclick=null; return; }
-    const b=e.target.closest('[data-db]'); if(!b) return;
-    const a=b.dataset.db;
-    const form = ()=>({url:$('#dbUrl').value.trim(), key:$('#dbKey').value.trim(), workspace:($('#dbWs').value.trim()||'default').slice(0,60)});
-    const valid = f=>{ if(!/^https:\/\/.+/.test(f.url)){ toast('Project URL을 https://로 시작하게 입력해 주세요', true); return false; } if(f.key.length<20){ toast('API 키를 확인해 주세요', true); return false; } if(/service_role|sb_secret_/.test(f.key)){ toast('secret 키는 사용할 수 없습니다. anon(publishable) 키를 넣어 주세요', true); return false; } return true; };
-    if(a==='close'){ m.classList.remove('show'); m.onclick=null; }
-    else if(a==='copysql'){ let ok=false; try{ await navigator.clipboard.writeText(DB_SQL); ok=true; }catch(_){ try{ const ta=document.createElement('textarea'); ta.value=DB_SQL; document.body.appendChild(ta); ta.select(); ok=document.execCommand('copy'); ta.remove(); }catch(__){} } toast(ok?'SQL을 복사했습니다':'복사하지 못했습니다. 직접 선택해 복사해 주세요', !ok); }
-    else if(a==='test'){ const f=form(); if(!valid(f)) return; b.disabled=true; b.textContent='확인 중…';
-      try{ await dbFetch(f, '?select=id&limit=1', {method:'GET'}); toast('연결에 성공했습니다'); }catch(err){ toast(err.message, true); }
-      b.disabled=false; b.textContent='연결 테스트'; }
-    else if(a==='save'){ const f=form(); if(!valid(f)) return; db.cfg=f; store.set('worknote.db', f); m.classList.remove('show'); m.onclick=null; const ok=await dbSync(true); if(ok) toast('데이터베이스에 연결했습니다'); }
-    else if(a==='sync'){ await dbSync(true); if($('#modal').classList.contains('show')) showDbModal(); }
-    else if(a==='off'){ if(!(await confirmBox('데이터베이스 연결을 해제할까요?','이 브라우저의 작성 이력은 그대로 남고, 이후로는 DB에 저장하지 않습니다. DB에 저장된 문서는 지워지지 않습니다.','연결 해제',true))) { showDbModal(); return; }
-      db.cfg=null; try{ localStorage.removeItem('worknote.db'); }catch(_){} setDbStatus('off'); toast('연결을 해제했습니다'); }
-  };
-}
-$('#dbBtn').onclick = ()=>{ showDbModal(); closeNav(); };
+
 
 /* ---------------- 작성 이력 → 엑셀(.xlsx) 내보내기 (외부 라이브러리 없이 작성) ---------------- */
 const TONE_NAME = {concise:'간결형', standard:'표준형', formal:'격식형'};
